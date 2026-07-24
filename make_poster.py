@@ -224,7 +224,7 @@ def draw_map(ax, point, radius, edges, green, water, buildings, crs):
     ax.set_axis_off()
 
 
-def draw_place_labels(ax, places, serif, size=8.5, min_dist=350):
+def draw_place_labels(ax, places, serif, size=9, min_dist=350):
     """Noms des villages en petites capitales espacées — sans chevauchement,
     sans doublon, et jamais coupés par le bord du cadre."""
     if places is None:
@@ -256,9 +256,9 @@ def draw_place_labels(ax, places, serif, size=8.5, min_dist=350):
         seen.add(name.lower())
         kept.append(pt)
         ax.text(pt.x, pt.y, text,
-                ha="center", va="center", color=CHARCOAL, alpha=0.85,
-                family=serif, size=size, zorder=6, clip_on=True,
-                path_effects=[pe.withStroke(linewidth=2.5 * SCALE,
+                ha="center", va="center", color=CHARCOAL, alpha=0.95,
+                family=serif, weight="bold", size=size, zorder=6, clip_on=True,
+                path_effects=[pe.withStroke(linewidth=2.8 * SCALE,
                                             foreground=CREAM)])
 
 
@@ -294,6 +294,12 @@ def make_poster(key, with_buildings=False, dpi=300):
     fig.savefig(out, dpi=dpi, facecolor=CREAM)
     plt.close(fig)
     print(f"  ✓ {out} ({dpi} dpi)")
+
+    # PDF à la taille physique exacte (A4) : impression « taille réelle » fiable.
+    from PIL import Image
+    with Image.open(out) as img:
+        img.convert("RGB").save(out.with_suffix(".pdf"), resolution=dpi)
+    print(f"  ✓ {out.with_suffix('.pdf')}")
     return out
 
 
