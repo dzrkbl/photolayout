@@ -30,7 +30,7 @@ import osmnx as ox
 CREAM = "#F5F1E8"
 CHARCOAL = "#2B2B28"
 GREEN = "#3E5C4B"
-GREEN_ALPHA = 0.5  # opacité de la végétation : accents verts francs, fond respirant
+GREEN_ALPHA = 0.9  # opacité de la végétation — même vert profond que l'eau (Napoli)
 
 # ------------------------------------------------------------------ villes
 CITIES = {
