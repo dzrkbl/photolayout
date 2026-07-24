@@ -211,11 +211,16 @@ def draw_map(ax, point, radius, edges, green, water, buildings, crs):
     ax.set_axis_off()
 
 
-def draw_place_labels(ax, places, serif, min_dist=350):
-    """Noms des villages en petites capitales espacées, sans chevauchement."""
+def draw_place_labels(ax, places, serif, size=8.5, min_dist=350):
+    """Noms des villages en petites capitales espacées — sans chevauchement,
+    sans doublon, et jamais coupés par le bord du cadre."""
     if places is None:
         return
-    kept = []
+    xmin, xmax = ax.get_xlim()
+    ymin, ymax = ax.get_ylim()
+    m_per_pt = (xmax - xmin) / (MAP_BOX[2] * FIG_W * 72)  # mètres par point typo
+
+    kept, seen = [], set()
     order = {"village": 0, "hamlet": 1}
     rows = sorted(
         places.iterrows(),
@@ -223,15 +228,22 @@ def draw_place_labels(ax, places, serif, min_dist=350):
     )
     for _, row in rows:
         name = clean_place_name(row)
-        if not name:
+        if not name or name.lower() in seen:
             continue
+        text = letterspace(name.upper(), " ", "  ")
+        half_w_text = 0.5 * len(text) * 0.55 * size * m_per_pt
+        half_h_text = 0.7 * size * m_per_pt
         pt = row.geometry.representative_point()
+        if not (xmin + half_w_text + 50 < pt.x < xmax - half_w_text - 50
+                and ymin + half_h_text + 50 < pt.y < ymax - half_h_text - 50):
+            continue
         if any(pt.distance(other) < min_dist for other in kept):
             continue
+        seen.add(name.lower())
         kept.append(pt)
-        ax.text(pt.x, pt.y, letterspace(name.upper(), " ", "  "),
+        ax.text(pt.x, pt.y, text,
                 ha="center", va="center", color=CHARCOAL, alpha=0.85,
-                family=serif, size=8.5, zorder=6, clip_on=True)
+                family=serif, size=size, zorder=6, clip_on=True)
 
 
 def add_typography(fig, city, serif):
