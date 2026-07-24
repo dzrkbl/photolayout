@@ -30,7 +30,7 @@ pip install -r requirements.txt
 python make_poster.py                     # Larbâa Nath Irathen (Fort National)
 python make_poster.py tizi_ouzou bejaia   # villes choisies
 python make_poster.py --all               # les 4 villes de la série
-python make_poster.py --no-buildings      # sans empreintes de bâtiments
+python make_poster.py --buildings         # ajoute les empreintes de bâtiments
 ```
 
 Les PNG sortent dans `posters/`. Villes disponibles :
