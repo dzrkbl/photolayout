@@ -14,7 +14,9 @@ Usage:
 """
 
 import argparse
+import re
 import sys
+import unicodedata
 from pathlib import Path
 
 import matplotlib
@@ -27,6 +29,7 @@ import osmnx as ox
 CREAM = "#F5F1E8"
 CHARCOAL = "#2B2B28"
 GREEN = "#3E5C4B"
+GREEN_ALPHA = 0.5  # opacité de la végétation : accents verts francs, fond respirant
 
 # ------------------------------------------------------------------ villes
 CITIES = {
@@ -35,7 +38,8 @@ CITIES = {
         subtitle="(Fort National)",
         point=(36.6366, 4.2067),
         coords="36.6366° N, 4.2067° E",
-        radius=1300,
+        radius=2500,      # englobe les villages alentour (Taza, At Etelli…)
+        labels=True,      # noms des villages en petites capitales
     ),
     "tizi_ouzou": dict(
         title="TIZI OUZOU",
@@ -80,6 +84,11 @@ GREEN_TAGS = {
 }
 WATER_TAGS = {"natural": ["water", "bay"], "waterway": True}
 BUILDING_TAGS = {"building": True}
+PLACE_TAGS = {"place": ["village", "hamlet"]}
+
+# Translittération des noms kabyles vers l'ASCII imprimable par la fonte
+# (Ɛ → E comme « At Ɛtelli » → « AT ETELLI », puis suppression des diacritiques).
+TRANSLIT = str.maketrans({"Ɛ": "E", "ɛ": "e", "Ɣ": "G", "ɣ": "g"})
 
 # Géométrie du poster : 12×18 in (ratio 2:3), 300 dpi → 3600×5400 px.
 FIG_W, FIG_H = 12, 18
@@ -108,8 +117,23 @@ def letterspace(text, letter_gap=" ", word_gap="   "):
     return word_gap.join(letter_gap.join(word) for word in text.split())
 
 
-def fetch_layers(point, radius, with_buildings):
-    """Récupère rues, végétation, eau (et bâtiments) autour d'un point."""
+def clean_place_name(row):
+    """Nom de lieu latin/ASCII à partir des tags OSM (souvent multi-écritures)."""
+    for key in ("name:fr", "int_name", "name"):
+        raw = row.get(key)
+        if isinstance(raw, str) and raw.strip():
+            s = raw.translate(TRANSLIT)
+            s = unicodedata.normalize("NFKD", s)
+            s = "".join(c for c in s if not unicodedata.combining(c))
+            s = re.sub(r"[^A-Za-z' -]", " ", s)
+            s = re.sub(r"\s+", " ", s).strip()
+            if s:
+                return s
+    return None
+
+
+def fetch_layers(point, radius, with_buildings, with_places):
+    """Récupère rues, végétation, eau (bâtiments, villages) autour d'un point."""
     dist = int(radius * 1.25)  # marge pour couvrir les coins du cadre
 
     print("  · réseau routier…")
@@ -131,7 +155,8 @@ def fetch_layers(point, radius, with_buildings):
     green = features(GREEN_TAGS, "végétation")
     water = features(WATER_TAGS, "eau")
     buildings = features(BUILDING_TAGS, "bâtiments") if with_buildings else None
-    return edges, green, water, buildings, crs
+    places = features(PLACE_TAGS, "villages") if with_places else None
+    return edges, green, water, buildings, places, crs
 
 
 def draw_map(ax, point, radius, edges, green, water, buildings, crs):
@@ -152,7 +177,7 @@ def draw_map(ax, point, radius, edges, green, water, buildings, crs):
     if green is not None:
         polys = green[green.geometry.geom_type.isin(["Polygon", "MultiPolygon"])]
         if not polys.empty:
-            polys.plot(ax=ax, fc=GREEN, ec="none", alpha=0.15, zorder=1)
+            polys.plot(ax=ax, fc=GREEN, ec="none", alpha=GREEN_ALPHA, zorder=1)
 
     if water is not None:
         polys = water[water.geometry.geom_type.isin(["Polygon", "MultiPolygon"])]
@@ -186,6 +211,29 @@ def draw_map(ax, point, radius, edges, green, water, buildings, crs):
     ax.set_axis_off()
 
 
+def draw_place_labels(ax, places, serif, min_dist=350):
+    """Noms des villages en petites capitales espacées, sans chevauchement."""
+    if places is None:
+        return
+    kept = []
+    order = {"village": 0, "hamlet": 1}
+    rows = sorted(
+        places.iterrows(),
+        key=lambda kv: order.get(kv[1].get("place"), 2),
+    )
+    for _, row in rows:
+        name = clean_place_name(row)
+        if not name:
+            continue
+        pt = row.geometry.representative_point()
+        if any(pt.distance(other) < min_dist for other in kept):
+            continue
+        kept.append(pt)
+        ax.text(pt.x, pt.y, letterspace(name.upper(), " ", "  "),
+                ha="center", va="center", color=CHARCOAL, alpha=0.85,
+                family=serif, size=8.5, zorder=6, clip_on=True)
+
+
 def add_typography(fig, city, serif):
     fig.text(0.5, 0.108, letterspace(city["title"]),
              ha="center", va="center", color=CHARCOAL,
@@ -198,18 +246,19 @@ def add_typography(fig, city, serif):
              family=serif, size=13)
 
 
-def make_poster(key, with_buildings=True, dpi=300):
+def make_poster(key, with_buildings=False, dpi=300):
     city = CITIES[key]
     print(f"▸ {city['title']}")
     serif = register_fonts()
-    edges, green, water, buildings, crs = fetch_layers(
-        city["point"], city["radius"], with_buildings
+    edges, green, water, buildings, places, crs = fetch_layers(
+        city["point"], city["radius"], with_buildings, city.get("labels", False)
     )
 
     fig = plt.figure(figsize=(FIG_W, FIG_H))
     fig.patch.set_facecolor(CREAM)
     ax = fig.add_axes(MAP_BOX)
     draw_map(ax, city["point"], city["radius"], edges, green, water, buildings, crs)
+    draw_place_labels(ax, places, serif)
     add_typography(fig, city, serif)
 
     OUT_DIR.mkdir(exist_ok=True)
@@ -225,8 +274,8 @@ def main():
     parser.add_argument("cities", nargs="*", choices=[*CITIES, []],
                         help=f"villes parmi : {', '.join(CITIES)}")
     parser.add_argument("--all", action="store_true", help="toutes les villes")
-    parser.add_argument("--no-buildings", action="store_true",
-                        help="sans empreintes de bâtiments")
+    parser.add_argument("--buildings", action="store_true",
+                        help="ajoute les empreintes de bâtiments (défaut : sans)")
     parser.add_argument("--dpi", type=int, default=300)
     args = parser.parse_args()
 
@@ -235,7 +284,7 @@ def main():
 
     keys = list(CITIES) if args.all else (args.cities or ["larbaa_nath_irathen"])
     for key in keys:
-        make_poster(key, with_buildings=not args.no_buildings, dpi=args.dpi)
+        make_poster(key, with_buildings=args.buildings, dpi=args.dpi)
 
 
 if __name__ == "__main__":
