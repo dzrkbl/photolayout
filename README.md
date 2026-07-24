@@ -4,7 +4,7 @@ Posters minimalistes de plans de villes générés à partir des **vraies donné
 OpenStreetMap** (via [osmnx](https://osmnx.readthedocs.io/), le moteur
 qu'utilise prettymaps) — plus jamais de carte hallucinée par un modèle
 texte→image. Le plan **et** la typographie sortent en un seul PNG 300 dpi
-prêt à imprimer (12×18 in, ratio 2:3).
+prêt à imprimer au format A4 portrait (210×297 mm, 2481×3507 px).
 
 ## Palette (identique aux autres posters de la série)
 

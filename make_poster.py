@@ -101,8 +101,9 @@ PLACE_TAGS = {"place": ["village", "hamlet", "suburb", "quarter", "neighbourhood
 # (Ɛ → E comme « At Ɛtelli » → « AT ETELLI », puis suppression des diacritiques).
 TRANSLIT = str.maketrans({"Ɛ": "E", "ɛ": "e", "Ɣ": "G", "ɣ": "g"})
 
-# Géométrie du poster : 12×18 in (ratio 2:3), 300 dpi → 3600×5400 px.
-FIG_W, FIG_H = 12, 18
+# Géométrie du poster : A4 portrait (210×297 mm), 300 dpi → 2481×3507 px.
+FIG_W, FIG_H = 8.27, 11.69
+SCALE = FIG_W / 12  # tailles de traits et de typo réglées sur la maquette 12×18 in
 MAP_BOX = (0.07, 0.175, 0.86, 0.775)  # (gauche, bas, largeur, hauteur) en fraction
 
 FONTS_DIR = Path(__file__).parent / "fonts"
@@ -196,12 +197,13 @@ def draw_map(ax, point, radius, edges, green, water, buildings, crs):
         if not polys.empty:
             polys.plot(ax=ax, fc=GREEN, ec="none", alpha=0.9, zorder=2)
         if not lines.empty:
-            lines.plot(ax=ax, color=GREEN, lw=0.9, alpha=0.7, zorder=2)
+            lines.plot(ax=ax, color=GREEN, lw=0.9 * SCALE, alpha=0.7, zorder=2)
 
     if buildings is not None:
         polys = buildings[buildings.geometry.geom_type.isin(["Polygon", "MultiPolygon"])]
         if not polys.empty:
-            polys.plot(ax=ax, fc=CREAM, ec=CHARCOAL, lw=0.35, alpha=0.9, zorder=3)
+            polys.plot(ax=ax, fc=CREAM, ec=CHARCOAL, lw=0.35 * SCALE, alpha=0.9,
+                       zorder=3)
 
     # Rues : une passe par classe de voie pour moduler l'épaisseur.
     def width_of(highway):
@@ -212,7 +214,7 @@ def draw_map(ax, point, radius, edges, green, water, buildings, crs):
     widths = edges["highway"].map(width_of)
     for w in sorted(widths.unique()):
         edges[widths == w].plot(
-            ax=ax, color=CHARCOAL, lw=w, zorder=4,
+            ax=ax, color=CHARCOAL, lw=w * SCALE, zorder=4,
             capstyle="round", joinstyle="round",
         )
 
@@ -227,6 +229,7 @@ def draw_place_labels(ax, places, serif, size=8.5, min_dist=350):
     sans doublon, et jamais coupés par le bord du cadre."""
     if places is None:
         return
+    size = size * SCALE
     xmin, xmax = ax.get_xlim()
     ymin, ymax = ax.get_ylim()
     m_per_pt = (xmax - xmin) / (MAP_BOX[2] * FIG_W * 72)  # mètres par point typo
@@ -255,19 +258,20 @@ def draw_place_labels(ax, places, serif, size=8.5, min_dist=350):
         ax.text(pt.x, pt.y, text,
                 ha="center", va="center", color=CHARCOAL, alpha=0.85,
                 family=serif, size=size, zorder=6, clip_on=True,
-                path_effects=[pe.withStroke(linewidth=2.5, foreground=CREAM)])
+                path_effects=[pe.withStroke(linewidth=2.5 * SCALE,
+                                            foreground=CREAM)])
 
 
 def add_typography(fig, city, serif):
     fig.text(0.5, 0.108, letterspace(city["title"]),
              ha="center", va="center", color=CHARCOAL,
-             family=serif, size=40)
+             family=serif, size=40 * SCALE)
     fig.text(0.5, 0.076, city["subtitle"],
              ha="center", va="center", color=CHARCOAL,
-             family=serif, style="italic", size=21)
+             family=serif, style="italic", size=21 * SCALE)
     fig.text(0.5, 0.050, city["coords"],
              ha="center", va="center", color=CHARCOAL,
-             family=serif, size=13)
+             family=serif, size=13 * SCALE)
 
 
 def make_poster(key, with_buildings=False, dpi=300):
