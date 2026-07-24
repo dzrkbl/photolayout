@@ -22,6 +22,7 @@ from pathlib import Path
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.font_manager as fm
+import matplotlib.patheffects as pe
 import matplotlib.pyplot as plt
 import osmnx as ox
 
@@ -36,10 +37,14 @@ CITIES = {
     "larbaa_nath_irathen": dict(
         title="LARBÂA NATH IRATHEN",
         subtitle="(Fort National)",
-        point=(36.6366, 4.2067),
+        # centre de carte décalé à l'ouest/sud du centre officiel pour faire
+        # entrer Taza, At Etelli et Ixliğen avec leurs étiquettes ; les
+        # coordonnées affichées restent celles de la ville.
+        point=(36.6351, 4.2000),
         coords="36.6366° N, 4.2067° E",
-        radius=2500,      # englobe les villages alentour (Taza, At Etelli…)
+        radius=2800,      # englobe les villages alentour (Taza, At Etelli…)
         labels=True,      # noms des villages en petites capitales
+        label_dist=350,
     ),
     "tizi_ouzou": dict(
         title="TIZI OUZOU",
@@ -47,6 +52,8 @@ CITIES = {
         point=(36.7169, 4.0497),
         coords="36.7169° N, 4.0497° E",
         radius=2200,
+        labels=True,
+        label_dist=450,
     ),
     "bejaia": dict(
         title="BEJAÏA",
@@ -54,6 +61,8 @@ CITIES = {
         point=(36.7509, 5.0567),
         coords="36.7509° N, 5.0567° E",
         radius=2200,
+        labels=True,
+        label_dist=450,
     ),
     "napoli": dict(
         title="NAPOLI",
@@ -61,6 +70,8 @@ CITIES = {
         point=(40.8518, 14.2681),
         coords="40.8518° N, 14.2681° E",
         radius=2200,
+        labels=True,
+        label_dist=550,
     ),
 }
 
@@ -84,7 +95,7 @@ GREEN_TAGS = {
 }
 WATER_TAGS = {"natural": ["water", "bay"], "waterway": True}
 BUILDING_TAGS = {"building": True}
-PLACE_TAGS = {"place": ["village", "hamlet"]}
+PLACE_TAGS = {"place": ["village", "hamlet", "suburb", "quarter", "neighbourhood"]}
 
 # Translittération des noms kabyles vers l'ASCII imprimable par la fonte
 # (Ɛ → E comme « At Ɛtelli » → « AT ETELLI », puis suppression des diacritiques).
@@ -221,10 +232,10 @@ def draw_place_labels(ax, places, serif, size=8.5, min_dist=350):
     m_per_pt = (xmax - xmin) / (MAP_BOX[2] * FIG_W * 72)  # mètres par point typo
 
     kept, seen = [], set()
-    order = {"village": 0, "hamlet": 1}
+    order = {"village": 0, "suburb": 1, "quarter": 2, "neighbourhood": 3, "hamlet": 4}
     rows = sorted(
         places.iterrows(),
-        key=lambda kv: order.get(kv[1].get("place"), 2),
+        key=lambda kv: order.get(kv[1].get("place"), 5),
     )
     for _, row in rows:
         name = clean_place_name(row)
@@ -243,7 +254,8 @@ def draw_place_labels(ax, places, serif, size=8.5, min_dist=350):
         kept.append(pt)
         ax.text(pt.x, pt.y, text,
                 ha="center", va="center", color=CHARCOAL, alpha=0.85,
-                family=serif, size=size, zorder=6, clip_on=True)
+                family=serif, size=size, zorder=6, clip_on=True,
+                path_effects=[pe.withStroke(linewidth=2.5, foreground=CREAM)])
 
 
 def add_typography(fig, city, serif):
@@ -270,7 +282,7 @@ def make_poster(key, with_buildings=False, dpi=300):
     fig.patch.set_facecolor(CREAM)
     ax = fig.add_axes(MAP_BOX)
     draw_map(ax, city["point"], city["radius"], edges, green, water, buildings, crs)
-    draw_place_labels(ax, places, serif)
+    draw_place_labels(ax, places, serif, min_dist=city.get("label_dist", 350))
     add_typography(fig, city, serif)
 
     OUT_DIR.mkdir(exist_ok=True)
